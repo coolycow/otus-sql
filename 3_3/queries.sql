@@ -274,125 +274,70 @@ INSERT INTO movie_actors (movie_id, actor_id) VALUES
 
 -- ВЫПОЛНЕННОЕ ЗАДАНИЕ
 
--- Представления (Views)
-    -- Создайте представление CustomerMovieRentalView, которое объединяет информацию о клиентах и фильмах, которые они брали в аренду.
-    -- Включите следующие столбцы: данные клиента (customer_id, first_name, last_name, email),
-    -- данные фильма (movie_id, title, genre) и данные аренды (rental_date, return_date).
-    
-    create view CustomerMovieRentalView as
-    select c.customer_id, c.first_name, c.last_name, c.email, m.movie_id, m.title, m.genre, r.rental_date, r.return_date
-    from customers c
-    join rentals r on c.customer_id = r.customer_id
-    join movies m on r.movie_id = m.movie_id;
+-- Создайте хранимую процедуру AddNewMovie, которая добавляет новый фильм в таблицу Movie, но только если фильма с таким названием 
+-- и годом выпуска еще нет в базе данных. Если фильм существует, процедура должна вывести сообщение о наличии дубля.
+create procedure AddNewMovie(p_title varchar, p_release_year int, p_genre varchar, p_rating decimal(2,1), p_duration int, p_description text, p_additional_info jsonb) as
+$$
+begin
+    if exists (select 1 from movies m where m.title = p_title and m.release_year = p_release_year) then
+        raise exception 'Movie with this title and release year already exists';
+    end if;
+    insert into movies (title, release_year, genre, rating, duration, description, additional_info)
+    values (p_title, p_release_year, p_genre, p_rating, p_duration, p_description, p_additional_info);
+end;
+$$ language plpgsql;
 
-    
-    -- Напишите запрос, который покажет все фильмы, взятые в аренду клиентами в марте 2022 года, используя созданное представление.
-    select * from CustomerMovieRentalView where rental_date between '2022-03-01' and '2022-03-31';
+call AddNewMovie('The Dark Knight', 2008, 'Action', 9.0, 152, 'Batman battles the Joker in Gotham City.', '{"languages": ["English", "Mandarin"], "budget": 185000000, "box_office": 1005455211, "director": "Christopher Nolan", "awards": ["Oscar", "Golden Globe"]}');
 
--- Триггеры (Triggers)
-    -- Создайте триггер, который автоматически обновляет поле rental_date в таблице Rental на текущую дату,
-    -- если пользователь пытается вставить запись с пустым значением rental_date. Используйте BEFORE INSERT триггер.
-    create or replace function update_rental_date_on_insert()
-    returns trigger as
-    $$
-    begin
-        if new.rental_date is null then
-            new.rental_date = current_date;
-        end if;
-        return new;
-    end;
-    $$ language plpgsql;
+-- Создайте хранимую процедуру GetCustomerRentalCount, которая принимает customer_id и возвращает количество фильмов, 
+-- которые этот клиент арендовал, а также сумму всех аренд (общее количество записей).
+create procedure GetCustomerRentalCount(p_customer_id int) as
+$$
+begin
+    raise notice 'Movie count: %', (select count(distinct r.movie_id) from rentals r where r.customer_id = p_customer_id);
+    raise notice 'Rental count: %', (select count(*) from rentals r where r.customer_id = p_customer_id);
+end;
+$$ language plpgsql;
 
-    create trigger update_rental_date_on_insert before insert on rentals for each row
-    execute function update_rental_date_on_insert();
+call GetCustomerRentalCount(1);
 
+-- Создайте хранимую процедуру UpdateMovieRating, которая обновляет рейтинг фильма. 
+-- Процедура должна принимать movie_id и новый рейтинг, но только если новый рейтинг находится в пределах от 0.0 до 10.0. 
+-- Если рейтинг выходит за эти рамки, выведите сообщение об ошибке.
+create procedure UpdateMovieRating(p_movie_id int, p_rating decimal(2,1)) as
+$$
+begin
+    if p_rating < 0.0 or p_rating > 10.0 then
+        raise exception 'Rating must be between 0.0 and 10.0';
+    end if;
+    update movies set rating = p_rating where movie_id = p_movie_id;
+end;
+$$ language plpgsql;
 
-    -- Создайте триггер, который предотвращает удаление записей о фильмах, если они связаны с таблицей Rental.
-    -- Используйте BEFORE DELETE триггер.
-    create or replace function prevent_movie_deletion_on_rental()
-    returns trigger as
-    $$
-    begin
-        if exists (select 1 from rentals where movie_id = old.movie_id) then
-            raise exception 'Cannot delete movie if it is rented';
-        end if;
-        return old;
-    end;
-    $$ language plpgsql;
+call UpdateMovieRating(1, 9.5);
 
-    create trigger prevent_movie_deletion_on_rental before delete on movies for each row
-    execute function prevent_movie_deletion_on_rental();
+-- Создайте хранимую процедуру DeleteCustomerWithLog, которая удаляет клиента из таблицы Customer, 
+-- а информацию об удалении (ID клиента, email, дата удаления) записывает в лог-таблицу Customer_Deletion_Log.
+create procedure DeleteCustomerWithLog(p_customer_id int) as
+$$
+begin
+    insert into Customer_Deletion_Log (customer_id, email, deletion_date)
+        values (p_customer_id, (select email from customers where customer_id = p_customer_id), current_date);
+    delete from rentals where customer_id = p_customer_id;
+    delete from customers where customer_id = p_customer_id;
+end;
+$$ language plpgsql;
 
--- Последовательности (Sequences)
-    -- Создайте последовательность actor_sequence, которая будет генерировать уникальные значения для новых актеров.
-    -- Начальное значение должно быть 1000, шаг увеличения — 1.
-    -- Добавьте нового актера в таблицу Actor, используя значение из созданной последовательности для поля actor_id.
-    -- Обновите последовательность, чтобы начальное значение было на 10 больше последнего созданного значения. Проверьте изменение.
-    create sequence actor_sequence start 1000 increment 1;
+call DeleteCustomerWithLog(1);
 
-    insert into actors (actor_id, first_name, last_name, birth_date, nationality)
-    values (nextval('actor_sequence'), 'John', 'Doe', '1990-01-01', 'USA');
+-- Создайте хранимую процедуру CalculateRentalRevenue, которая рассчитывает общую выручку от аренды фильмов для указанного клиента.
+-- Процедура должна принимать customer_id в качестве параметра, подсчитывать общую сумму аренд на основе фиксированной стоимости 
+-- аренды каждого фильма (например, 5 долларов за фильм) и выводить результат.
+create procedure CalculateRentalRevenue(p_customer_id int) as
+$$
+begin
+    raise notice 'Rental revenue: %', (select count(*) as rental_count from rentals r where r.customer_id = p_customer_id) * 5;
+end;
+$$ language plpgsql;
 
-    select setval( 'actor_sequence', (select coalesce(max(actor_id), 0) from actors) + 10);
-
--- Триггеры (Triggers)
-    -- Создайте триггер, который при обновлении поля return_date в таблице Rental устанавливает текущую дату,
-    -- если поле NULL, и оставляет значение без изменений, если оно больше текущей даты.
-    create or replace function update_return_date_on_update()
-    returns trigger as
-    $$
-    begin
-        if new.return_date is null then
-            new.return_date = current_date;
-        elsif new.return_date > current_date then
-            new.return_date = old.return_date;
-        end if;
-        return new;
-    end;
-    $$ language plpgsql;
-
-    create trigger update_return_date_on_update before update on rentals for each row
-    execute function update_return_date_on_update();
-
-    -- Создайте триггер, который будет записывать информацию о каждом удалении записи из таблицы Customer
-    -- в отдельную таблицу Customer_Deletion_Log. Запись должна включать ID клиента, дату удаления и email клиента.
-    create table Customer_Deletion_Log (
-        customer_id INT,
-        deletion_date DATE,
-        email VARCHAR(255)
-    );
-
-    create or replace function log_customer_deletion()
-    returns trigger as
-    $$
-    begin
-        insert into Customer_Deletion_Log (customer_id, deletion_date, email) values (old.customer_id, current_date, old.email);
-        return old;
-    end;
-    $$ language plpgsql;
-
-    create trigger log_customer_deletion after delete on customers for each row
-    execute function log_customer_deletion();
-
-    -- Создайте триггер, который после добавления новой записи в таблицу Movie автоматически будет увеличивать количество фильмов 
-    -- данного жанра в таблице Genre_Statistics. 
-    -- Если запись о жанре уже существует, увеличьте счетчик на 1; если не существует, создайте новую запись для этого жанра.
-    create table Genre_Statistics (
-        genre VARCHAR(100) primary key,
-        count INT
-    );
-
-    create or replace function update_genre_statistics()
-    returns trigger as
-    $$
-    begin
-        insert into Genre_Statistics (genre, count) values (new.genre, 1)
-        on conflict (genre) do update set count = Genre_Statistics.count + 1;
-        return new;
-    end;
-    $$ language plpgsql;
-
-    create trigger update_genre_statistics after insert on movies for each row
-    execute function update_genre_statistics();
-
-
+call CalculateRentalRevenue(1);
