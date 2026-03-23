@@ -276,54 +276,68 @@ INSERT INTO movie_actors (movie_id, actor_id) VALUES
 
 -- Создайте функцию GetMovieDurationInHours, которая принимает movie_id в качестве параметра и возвращает продолжительность 
 -- фильма в часах (округленную до двух знаков после запятой).
-create function GetMovieDurationInHours(movie_id int)
+create or replace function GetMovieDurationInHours(p_movie_id int)
 returns numeric as
 $$
 begin
-    return round(m.duration / 60.0, 2);
+    return round((select duration from movies where movie_id = p_movie_id) / 60.0, 2);
 end;
 $$ language plpgsql;
 
+select GetMovieDurationInHours(1);
+
 -- Создайте функцию GetMoviesByDirector, которая принимает имя режиссера в качестве параметра и возвращает таблицу с названием 
 -- фильма, годом выпуска и жанром для всех фильмов этого режиссера.
-create function GetMoviesByDirector(director_name varchar)
+create or replace function GetMoviesByDirector(director_name varchar)
 returns table (title varchar, year int, genre varchar) as
 $$
 begin
     return query select m.title, m.release_year, m.genre from movies m 
-    join directors d on m.director_id = d.director_id 
-    where d.name = director_name;
+    where m.additional_info->>'director' = director_name;
 end;
 $$ language plpgsql;
 
+select GetMoviesByDirector('Christopher Nolan');
+
 -- Создайте функцию CalculateCustomerRentalCost, которая принимает customer_id и возвращает общую стоимость всех аренд этого клиента,
 -- основываясь на фиксированной цене аренды одного фильма (например, 5 долларов).
-create function CalculateCustomerRentalCost(customer_id int)
+create or replace function CalculateCustomerRentalCost(p_customer_id int)
 returns numeric as
 $$
 begin
-    return (select count(*) from rentals r where r.customer_id = customer_id) * 5;
+    return (select count(*) from rentals r where r.customer_id = p_customer_id) * 5;
 end;
 $$ language plpgsql;
+
+select CalculateCustomerRentalCost(1);
 
 -- Создайте функцию GetCustomerStatus, которая принимает customer_id и возвращает статус клиента в зависимости от количества аренд.
 -- Если клиент арендовал более 10 фильмов, вернуть статус 'VIP'.
 -- Если клиент арендовал от 5 до 10 фильмов, вернуть статус 'Regular'.
 -- Если клиент арендовал менее 5 фильмов, вернуть статус 'Newbie'.
-create function GetCustomerStatus(customer_id int)
+create or replace function GetCustomerStatus(p_customer_id int)
 returns varchar as
 $$
 begin
-    return case when (select count(*) from rentals r where r.customer_id = customer_id) > 10 then 'VIP' when (select count(*) from rentals r where r.customer_id = customer_id) between 5 and 10 then 'Regular' else 'Newbie' end;
+    return case 
+    when (select count(*) from rentals r where r.customer_id = p_customer_id) > 10 then 'VIP' 
+    when (select count(*) from rentals r where r.customer_id = p_customer_id) between 5 and 10 then 'Regular' 
+    else 'Newbie' end;
 end;
 $$ language plpgsql;
 
+select GetCustomerStatus(1);
+
 -- Создайте функцию GetMostPopularGenre, которая возвращает жанр, по которому арендовали больше всего фильмов.
 -- Функция не принимает параметров и возвращает строку с названием самого популярного жанра.
-create function GetMostPopularGenre()
+create or replace function GetMostPopularGenre()
 returns varchar as
 $$
-begin
-    return (select genre from movies m group by m.genre order by count(*) desc limit 1);
-end;
+    begin
+        return (select genre from (
+            select genre, count(*) as rental_count from movies m join rentals r on m.movie_id = r.movie_id group by m.genre
+        ) as genre_rental_count order by rental_count desc limit 1);
+    end;
 $$ language plpgsql;
+
+select GetMostPopularGenre();
