@@ -78,7 +78,7 @@ BEGIN
     ORDER BY seq_no
   LOOP
     IF r_prev IS NOT NULL THEN
-      acc := acc + fn_distance_km_wgs84(r_prev.base_geom, r_curr.base_geom);
+      acc := acc + fn_distance_km_wgs84(r_prev.base_geom, r_curr.base_geom); -- см. функцию fn_distance_km_wgs84(geometry, geometry) в 03_functions.sql
     END IF;
     r_prev := r_curr;
   END LOOP;

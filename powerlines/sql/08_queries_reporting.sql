@@ -87,6 +87,41 @@ WHERE ST_DWithin(
   5000
 );
 
+------------------------------------------------- Вызов функций -------------------------------------------------
+-- Вызов функции fn_distance_km_wgs84(geometry, geometry) для расстояния между двумя точками WGS84.
+SELECT fn_distance_km_wgs84(ST_SetSRID(ST_MakePoint(34.33, 56.25), 4326), ST_SetSRID(ST_MakePoint(34.34, 56.26), 4326)) AS dist_km;
+
+-- Вызов функции fn_support_count_for_line(BIGINT) для подсчета числа опор на ВЛ.
+SELECT fn_support_count_for_line(1) AS support_count;
+
+-- Вызов функции fn_document_display_title(BIGINT) для несуществующего документа.
+SELECT fn_document_display_title(4) AS document_title;
+
+------------------------------------------------- Вызов процедур -------------------------------------------------
+-- Вызов процедуры sp_register_outage(BIGINT, TEXT, NUMERIC) для регистрации нового отключения.
+CALL sp_register_outage(1, 'Авария', 100.0);
+
+-- Вызов процедуры sp_close_outage(BIGINT) для закрытия отключения.
+CALL sp_close_outage(1);
+
+-- Вызов процедуры sp_add_current_measurement(BIGINT, NUMERIC, TIMESTAMPTZ, TEXT) для добавления замера тока.
+CALL sp_add_current_measurement(1, 100.0, '2026-04-01 10:00:00+03', 'Замер тока');
+
+-- Вызов процедуры sp_link_document_to_line(BIGINT, BIGINT) для привязки документа к ВЛ.
+CALL sp_link_document_to_line(1, 1);
+
+-- Вызов процедуры sp_recalculate_line_length_km(BIGINT) для пересчета длины ВЛ.
+CALL sp_recalculate_line_length_km(1);
+
+------------------------------------------------- Вызов представлений -------------------------------------------------
+-- Вызов представления v_power_lines_geo для вывода всех ВЛ с указанием ID региона и ID страны.
+SELECT * FROM v_power_lines_geo;
+
+-- Вызов представления v_supports_enriched для вывода всех опор с указанием ID ВЛ, названия ВЛ, материала, шифра, номера опоры, координаты точки и числа опор на ВЛ.
+SELECT * FROM v_supports_enriched;
+
+-- Вызов представления v_open_outages для вывода всех незавершенных отключений с указанием ID ВЛ, названия ВЛ, времени начала отключения, причины отключения и тока до события.
+SELECT * FROM v_open_outages;
 
 ------------------------------------------------- Мониторинг производительности -------------------------------------------------
 -- Мониторинг производительности (системные представления PostgreSQL).
