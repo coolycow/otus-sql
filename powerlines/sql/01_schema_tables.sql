@@ -3,8 +3,43 @@
 -- Геоданные — PostGIS: точки в SRID 4326 (WGS84), тип geometry(Point, 4326).
 -- Расширенные атрибуты линии — в JSONB.
 -- Требуется расширение PostGIS.
--- Ко всем таблицам добавлены комментарии, описывающие их назначение (чтобы не забыть).
--- Дополнительно комментарии добавлены к сложным столбцам (чтобы не забыть).
+-- Ко всем таблицам добавлены комментарии, описывающие их назначение (чтобы не забыть, плюс удобно смотреть в том же DBeaver).
+-- Дополнительно комментарии добавлены к сложным столбцам (чтобы не забыть, плюс удобно смотреть в том же DBeaver).
+
+-------------------------------------------------- Создание пользователя (код из pgAdmin 4) --------------------------------------------------
+-- DROP ROLE IF EXISTS powerlines;
+
+CREATE ROLE powerlines WITH
+  LOGIN
+  SUPERUSER
+  INHERIT
+  CREATEDB
+  CREATEROLE
+  NOREPLICATION
+  BYPASSRLS
+  ENCRYPTED PASSWORD 'SCRAM-SHA-256$4096:5JJ8nfMbtAFXNXqicMCfdw==$VixJsiOWTQ/gromhBzyAWbWjamB9jFFukKk7sC+Bczo=:vjsQ4TDARnHynG+Pay+JOhBahEnbCffLoNLMhy3Ni1M=';
+
+-------------------------------------------------- Создание базы данных (код из pgAdmin 4) --------------------------------------------------
+-- DROP DATABASE IF EXISTS powerlines;
+
+CREATE DATABASE powerlines
+    WITH
+    OWNER = postgres
+    ENCODING = 'UTF8'
+    LC_COLLATE = 'Russian_Russia.1251'
+    LC_CTYPE = 'Russian_Russia.1251'
+    LOCALE_PROVIDER = 'libc'
+    TABLESPACE = pg_default
+    CONNECTION LIMIT = -1
+    IS_TEMPLATE = False;
+
+GRANT TEMPORARY, CONNECT ON DATABASE powerlines TO PUBLIC;
+
+GRANT ALL ON DATABASE powerlines TO postgres;
+
+GRANT TEMPORARY ON DATABASE powerlines TO powerlines;
+
+-------------------------------------------------- Установка расширений --------------------------------------------------
 
 -- Установка расширения PostGIS.
 CREATE EXTENSION IF NOT EXISTS postgis;
