@@ -41,7 +41,7 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS tr_conductors_supports_same_line ON conductors;
+DROP TRIGGER IF EXISTS tr_conductors_integrity ON conductors;
 
 CREATE TRIGGER tr_conductors_integrity
   BEFORE INSERT OR UPDATE OF line_id, from_support_id, to_support_id, from_traverse_id, to_traverse_id
