@@ -56,5 +56,6 @@
 
 ## Дополнительно
 
+- **Презентация для защиты:** `PRESENTATION.pdf` (исходная вёрстка — `PRESENTATION.typ`, пересборка: `npx typst compile PRESENTATION.typ PRESENTATION.pdf`). Текст слайдов дублируется в `PRESENTATION.md`.
 - **JSON**: поля `power_lines.extra_spec` и `documents.meta` для гибких атрибутов без изменения схемы.
 - **PostGIS**: координаты — `geometry(Point, 4326)`; расстояния в функциях и процедурах считаются через приведение к `geography` (эллипсоид WGS84).
