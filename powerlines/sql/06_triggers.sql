@@ -57,20 +57,21 @@ CREATE OR REPLACE FUNCTION tf_supports_touch_power_line()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $$
-DECLARE
-  v_line BIGINT;
 BEGIN
   IF TG_OP = 'DELETE' THEN
-    v_line := OLD.line_id;
-  ELSE
-    v_line := NEW.line_id;
-  END IF;
-
-  UPDATE power_lines SET updated_at = now() WHERE line_id = v_line;
-  IF TG_OP = 'DELETE' THEN
+    UPDATE power_lines SET updated_at = now() WHERE line_id = OLD.line_id;
     RETURN OLD;
+  ELSIF TG_OP = 'INSERT' THEN
+    UPDATE power_lines SET updated_at = now() WHERE line_id = NEW.line_id;
+    RETURN NEW;
+  ELSE
+    -- UPDATE: при смене line_id затрагиваются обе ВЛ (старая теряет опору, новая получает).
+    UPDATE power_lines
+    SET updated_at = now()
+    WHERE line_id = NEW.line_id
+       OR line_id = OLD.line_id;
+    RETURN NEW;
   END IF;
-  RETURN NEW;
 END;
 $$;
 
@@ -81,7 +82,7 @@ CREATE TRIGGER tr_supports_touch_power_line
   EXECUTE PROCEDURE tf_supports_touch_power_line();
 
 COMMENT ON TRIGGER tr_supports_touch_power_line ON supports IS
-  'Пробрасывает изменение опор в updated_at ВЛ.';
+  'Пробрасывает изменение опор в updated_at ВЛ; при смене line_id обновляет обе затронутые ВЛ.';
 
 -- Журнал: каждое новое отключение пишется в audit_log для последующего разбора.
 CREATE OR REPLACE FUNCTION tf_outages_write_audit()
